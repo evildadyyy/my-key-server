@@ -1,0 +1,66 @@
+const express = require('express');
+const { google } = require('googleapis');
+
+const app = express();
+app.use(express.json());
+
+// --- НАСТРОЙКИ ---
+const SPREADSHEET_ID = '1przrWHUBu_wq5PiO6wAvCPx6dBzDV8a1hZWNiAzYaSw'; // Ваш ID таблицы
+const SHEET_NAME = 'Лист1';
+
+// --- Функция проверки ключа ---
+async function checkAccessCode(code) {
+    try {
+        const auth = new google.auth.GoogleAuth({
+            keyFile: 'credentials.json', // файл с ключом сервисного аккаунта
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        });
+        const sheets = google.sheets({ version: 'v4', auth });
+        const range = `${SHEET_NAME}!A:C`;
+
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: range,
+        });
+        const rows = response.data.values || [];
+
+        for (let i = 1; i < rows.length; i++) {
+            const key = String(rows[i][0]).trim();
+            const used = String(rows[i][1]).trim();
+            if (key === code) {
+                if (used === 'YES') {
+                    return { success: false, error: 'Ключ уже использован' };
+                }
+                const rowIndex = i + 1;
+                const updateRange = `${SHEET_NAME}!B${rowIndex}:C${rowIndex}`;
+                await sheets.spreadsheets.values.update({
+                    spreadsheetId: SPREADSHEET_ID,
+                    range: updateRange,
+                    valueInputOption: 'RAW',
+                    resource: { values: [['YES', new Date().toISOString()]] },
+                });
+                return { success: true };
+            }
+        }
+        return { success: false, error: 'Неверный ключ' };
+    } catch (error) {
+        console.error('Ошибка сервера:', error);
+        return { success: false, error: 'Ошибка сервера: ' + error.toString() };
+    }
+}
+
+// --- Эндпоинт для проверки ключа ---
+app.post('/check-key', async (req, res) => {
+    const { code } = req.body;
+    if (!code) {
+        return res.status(400).json({ success: false, error: 'Введите ключ!' });
+    }
+    const result = await checkAccessCode(code);
+    res.json(result);
+});
+
+// --- Запуск сервера ---
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Сервер запущен на порту ${PORT}`);
+});
