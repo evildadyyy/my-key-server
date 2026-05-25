@@ -3,6 +3,7 @@ const { google } = require('googleapis');
 
 const app = express();
 
+// CORS
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -17,10 +18,9 @@ const SHEET_NAME = 'Лист1';
 
 async function checkAccessCode(code) {
     try {
-        const credentialsJson = process.env.CREDENTIALS_JSON;
-        if (!credentialsJson) throw new Error('CREDENTIALS_JSON environment variable not set');
+        // Используем файл credentials.json, который лежит в корне проекта
         const auth = new google.auth.GoogleAuth({
-            credentials: JSON.parse(credentialsJson),
+            keyFile: 'credentials.json',
             scopes: ['https://www.googleapis.com/auth/spreadsheets'],
         });
         const sheets = google.sheets({ version: 'v4', auth });
