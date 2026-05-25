@@ -1,5 +1,6 @@
 const express = require('express');
 const { google } = require('googleapis');
+const fs = require('fs');
 
 const app = express();
 
@@ -15,20 +16,30 @@ app.use(express.json());
 const SPREADSHEET_ID = '1przrWHUBu_wq5PiO6wAvCPx6dBzDV8a1hZWNiAzYaSw';
 const SHEET_NAME = 'Лист1';
 
-async function checkAccessCode(code) {
+let auth = null;
+
+async function getAuth() {
+    if (auth) return auth;
     try {
-        const credentialsJson = process.env.CREDENTIALS_JSON;
-        if (!credentialsJson) throw new Error('Переменная CREDENTIALS_JSON не задана');
-        
-        // Исправляем экранирование переносов строк
-        const fixedJson = credentialsJson.replace(/\\n/g, '\n');
-        const credentials = JSON.parse(fixedJson);
-        
-        const auth = new google.auth.GoogleAuth({
+        // Пытаемся загрузить credentials.json из файла
+        const content = fs.readFileSync('credentials.json', 'utf8');
+        const credentials = JSON.parse(content);
+        auth = new google.auth.GoogleAuth({
             credentials: credentials,
             scopes: ['https://www.googleapis.com/auth/spreadsheets'],
         });
-        const sheets = google.sheets({ version: 'v4', auth });
+        console.log('Аутентификация через credentials.json успешна');
+        return auth;
+    } catch (err) {
+        console.error('Ошибка загрузки credentials.json:', err);
+        throw new Error('Не удалось загрузить credentials.json');
+    }
+}
+
+async function checkAccessCode(code) {
+    try {
+        const authClient = await getAuth();
+        const sheets = google.sheets({ version: 'v4', auth: authClient });
         const range = `${SHEET_NAME}!A:C`;
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
