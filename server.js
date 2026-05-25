@@ -3,14 +3,12 @@ const { google } = require('googleapis');
 
 const app = express();
 
-// Разрешаем CORS для запросов с вашего сайта
+// CORS
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*'); // для теста разрешаем всем
+    res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
 });
 
@@ -19,12 +17,23 @@ app.use(express.json());
 const SPREADSHEET_ID = '1przrWHUBu_wq5PiO6wAvCPx6dBzDV8a1hZWNiAzYaSw';
 const SHEET_NAME = 'Лист1';
 
+async function getAuth() {
+    // Берём JSON из переменной окружения
+    const credentialsJson = process.env.CREDENTIALS_JSON;
+    if (!credentialsJson) {
+        throw new Error('CREDENTIALS_JSON environment variable not set');
+    }
+    const credentials = JSON.parse(credentialsJson);
+    const auth = new google.auth.GoogleAuth({
+        credentials: credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+    return auth;
+}
+
 async function checkAccessCode(code) {
     try {
-        const auth = new google.auth.GoogleAuth({
-            keyFile: 'credentials.json',
-            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-        });
+        const auth = await getAuth();
         const sheets = google.sheets({ version: 'v4', auth });
         const range = `${SHEET_NAME}!A:C`;
         const response = await sheets.spreadsheets.values.get({
